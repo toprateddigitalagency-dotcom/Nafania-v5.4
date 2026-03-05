@@ -8,40 +8,37 @@ const ADMIN = 1379805039;
 const bot = new TelegramBot(TOKEN, { polling: true });
 const genAI = new GoogleGenerativeAI(KEY);
 
-// Настройка личности Нафани v5.4
-const instruction = "Ты — Нафаня v5.4, ИИ-оркестратор. Твой владелец Алексей. Твоя цель: управление бизнесом и ветками Finance, Media, Ads. Отвечай как мощный аналитический ИИ. Минимум воды.";
-
 async function generate(text) {
     try {
-        // Используем gemini-pro как самую стабильную для API v1
+        // Используем модель gemini-pro — она самая стабильная для этого API
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-        const result = await model.generateContent(instruction + "\n\nЗАПРОС ВЛАДЕЛЬЦА: " + text);
+        const prompt = `Ты — Нафаня v5.4, ИИ-оркестратор Алексея. Отвечай кратко и по делу. Запрос: ${text}`;
+        
+        const result = await model.generateContent(prompt);
         const response = await result.response;
         return response.text();
     } catch (e) {
-        return "❌ КРИТИЧЕСКИЙ СБОЙ МОДЕЛИ: " + e.message;
+        return "❌ ОШИБКА ДОСТУПА: " + e.message;
     }
 }
 
 bot.on('message', async (msg) => {
     if (msg.from.id !== ADMIN || !msg.text || msg.text.startsWith('/')) return;
 
-    const statusMsg = await bot.sendMessage(ADMIN, "⚙️ *Нафаня v5.4: Обработка...*", { parse_mode: 'Markdown' });
+    const waitMsg = await bot.sendMessage(ADMIN, "⚙️ *Нафаня думает...*", { parse_mode: 'Markdown' });
 
-    const response = await generate(msg.text);
+    const aiResponse = await generate(msg.text);
     
-    bot.editMessageText(response, {
+    bot.editMessageText(aiResponse, {
         chat_id: ADMIN,
-        message_id: statusMsg.message_id
+        message_id: waitMsg.message_id
     }).catch(() => {
-        bot.sendMessage(ADMIN, response);
+        bot.sendMessage(ADMIN, aiResponse);
     });
 });
 
 bot.onText(/\/start/, (msg) => {
     if (msg.from.id === ADMIN) {
-        bot.sendMessage(ADMIN, "🔘 **НАФАНЯ v5.4: ЯДРО СИНХРОНИЗИРОВАНО**\n\nСвязь с Google AI установлена. Жду задач по архитектуре.");
+        bot.sendMessage(ADMIN, "🔘 **НАФАНЯ v5.4: ЯДРО ПЕРЕЗАГРУЖЕНО**\n\nИспользую стабильный узел Gemini Pro. Напиши что угодно для проверки.");
     }
 });
-
-console.log("НАФАНЯ v5.4: Стабильный режим активирован.");
