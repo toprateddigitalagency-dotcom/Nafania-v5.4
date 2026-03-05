@@ -1,0 +1,15 @@
+{
+  "name": "nafanya-v5",
+  "version": "1.0.0",
+  "description": "Nafanya Orchestrator",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.64.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
