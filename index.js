@@ -1,64 +1,46 @@
 const TelegramBot = require('node-telegram-bot-api');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// КОНФИГУРАЦИЯ СИСТЕМЫ
-const TOKEN = '7629814043:AAHrljzdtBl-vFCEvzp--jZ21JORicHH6PI';
+// --- КОНФИГУРАЦИЯ ---
+const TG_TOKEN = '7629814043:AAHrljzdtBl-vFCEvzp--jZ21JORicHH6PI';
+const GEMINI_API_KEY = 'AIzaSyCFz057vs-7B_i5FH32-wXXmv5bw6zSvso'; 
 const ADMIN_ID = 1379805039;
 
-const bot = new TelegramBot(TOKEN, { polling: true });
+const bot = new TelegramBot(TG_TOKEN, { polling: true });
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-// Имитация состояния веток системы
-const systemStatus = {
-    core: "🟢 Active",
-    finance: "🟡 Standby (Waiting for API)",
-    media: "🟡 Standby (Waiting for Content)",
-    ads: "🟡 Standby (Waiting for Budget)"
-};
+const SYSTEM_PROMPT = "Ты — Нафаня v5.4, главный ИИ-оркестратор. Твой владелец — Алексей. Отвечай как мощная бизнес-система: четко, по делу, с аналитикой веток Finance, Media и Ads. Минимум воды.";
 
-// Главное меню
-const mainKeyboard = {
-    reply_markup: {
-        keyboard: [
-            ['📊 Статус Системы', '💰 AI-Finance'],
-            ['📢 AI-Media', '🚀 Запустить Трафик']
-        ],
-        resize_keyboard: true
+async function askGemini(userPrompt) {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
+    const result = await model.generateContent(`${SYSTEM_PROMPT}\n\nЗапрос Алексея: ${userPrompt}`);
+    const response = await result.response;
+    return response.text();
+}
+
+bot.on('message', async (msg) => {
+    if (msg.from.id !== ADMIN_ID || !msg.text || msg.text.startsWith('/')) return;
+
+    const waitMsg = await bot.sendMessage(ADMIN_ID, "🧠 *Нафаня анализирует...*", { parse_mode: 'Markdown' });
+
+    try {
+        const aiResponse = await askGemini(msg.text);
+        // Если ответ слишком длинный, Телеграм может выдать ошибку, поэтому режем или шлем как есть
+        bot.editMessageText(aiResponse, { 
+            chat_id: ADMIN_ID, 
+            message_id: waitMsg.message_id,
+            parse_mode: 'Markdown' 
+        }).catch(() => bot.editMessageText(aiResponse, { chat_id: ADMIN_ID, message_id: waitMsg.message_id }));
+        
+    } catch (error) {
+        bot.editMessageText("❌ ОШИБКА ЯДРА: " + error.message, { chat_id: ADMIN_ID, message_id: waitMsg.message_id });
     }
-};
+});
 
-// Обработка команд
 bot.onText(/\/start/, (msg) => {
     if (msg.from.id === ADMIN_ID) {
-        bot.sendMessage(ADMIN_ID, 
-            `🛰 **Нафаня v5.4: Оркестратор запущен**\n\nПриветствую, Алексей. Система развернута на внешнем узле и готова к работе.\n\nИспользуй меню ниже для управления ветками.`, 
-            { parse_mode: 'Markdown', ...mainKeyboard }
-        );
-    } else {
-        bot.sendMessage(msg.chat.id, "Доступ запрещен. Требуется авторизация владельца.");
+        bot.sendMessage(ADMIN_ID, "🔘 **НАФАНЯ v5.4: ЯДРО АКТИВИРОВАНО**\n\nАлексей, я готов к управлению проектом. Вводи любую задачу.");
     }
 });
 
-bot.on('message', (msg) => {
-    const text = msg.text;
-    if (msg.from.id !== ADMIN_ID) return;
-
-    if (text === '📊 Статус Системы') {
-        const statusReport = `📋 **ОТЧЕТ ОРКЕСТРАТОРА:**\n\n` +
-            `⬡ AI-Core: ${systemStatus.core}\n` +
-            `💰 AI-Finance: ${systemStatus.finance}\n` +
-            `◉ AI-Media: ${systemStatus.media}\n` +
-            `◆ AI-Ads: ${systemStatus.ads}\n\n` +
-            `📍 Узел: Render Cloud (Free)`;
-        bot.sendMessage(ADMIN_ID, statusReport, { parse_mode: 'Markdown' });
-    }
-
-    if (text === '💰 AI-Finance') {
-        bot.sendMessage(ADMIN_ID, "💵 **Ветка AI-Finance:**\nТекущая прибыль: 0.00$\nОжидание первой транзакции...");
-    }
-});
-
-// Обработка ошибок
-bot.on('polling_error', (error) => {
-    console.log("Ошибка связи с Telegram: ", error.code);
-});
-
-console.log("Нафаня v5.4 успешно запущен в облаке.");
+console.log("Нафаня v5.4 запущена на ключе Gemini.");
