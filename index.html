@@ -1,0 +1,35 @@
+<script>
+const NAFANYA_CLIENT = {
+    pass: "", // Будет введено при входе
+    api: window.location.origin,
+
+    async send(cmd) {
+        const res = await fetch(`${this.api}/api/execute`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({command: cmd, password: this.pass})
+        });
+        const data = await res.json();
+        this.renderLogs(data.db.logs);
+        this.updateStats(data.db);
+    },
+
+    renderLogs(logs) {
+        const container = document.querySelector('.op-msgs');
+        container.innerHTML = logs.map(l => `<div class="msg-branch">${l}</div>`).join('');
+        container.scrollTop = container.scrollHeight;
+    },
+
+    updateStats(db) {
+        document.querySelector('.opp-val').innerText = db.balance + " ₴";
+    }
+};
+
+// Функция логина
+function login() {
+    const p = document.getElementById('master-pass').value;
+    NAFANYA_CLIENT.pass = p;
+    document.getElementById('master-auth').style.display = 'none';
+    document.getElementById('os-content').style.display = 'block';
+}
+</script>
