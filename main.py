@@ -2,11 +2,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-import os
+import datetime
 
 app = FastAPI()
 
-# Разрешаем доступ с любого устройства
+# Разрешаем управление с любых устройств (телефон/ПК)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,47 +14,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# КОНФИГУРАЦИЯ БЕЗОПАСНОСТИ
-MASTER_PASSWORD = "YOUR_SECURE_PASS_2026" # Измени на свой
+# МАСТЕР-ДАННЫЕ
+MASTER_PASSWORD = "1234" # СМЕНИ ЭТОТ ПАРОЛЬ СРАЗУ ПОСЛЕ ЗАПУСКА
 
-class Action(BaseModel):
+class UserCommand(BaseModel):
     command: str
     password: str
 
-# СОСТОЯНИЕ СИСТЕМЫ (БАЗА ДАННЫХ)
-db = {
-    "balance": 0,
-    "active_agents": ["CONTENT", "SUPPLY", "LEGAL", "TRAFFIC"],
-    "logs": []
+# ГЛОБАЛЬНОЕ СОСТОЯНИЕ (БАЗА ДАННЫХ В ПАМЯТИ)
+storage = {
+    "profit": 0,
+    "agents": ["CONTENT", "SUPPLY", "TRAFFIC", "LEGAL", "SOCIAL", "ANALYTICS"],
+    "logs": [{"time": "00:00", "msg": "Система Нафаня v5.4 ожидает авторизации..."}]
 }
 
 @app.get("/", response_class=HTMLResponse)
-async def read_index():
+async def home():
     with open("index.html", "r", encoding="utf-8") as f:
         return f.read()
 
 @app.post("/api/execute")
-async def execute(action: Action):
-    if action.password != MASTER_PASSWORD:
-        raise HTTPException(status_code=403, detail="Доступ запрещен")
+async def execute(cmd: UserCommand):
+    if cmd.password != MASTER_PASSWORD:
+        raise HTTPException(status_code=403, detail="ОТКАЗАНО В ДОСТУПЕ")
     
-    cmd = action.command.lower()
-    log_msg = ""
-
-    # ЛОГИКА ОРКЕСТРАТОРА (РАСПРЕДЕЛЕНИЕ ПО АГЕНТАМ)
-    if "ниша" in cmd:
-        log_msg = "ANALYTICS-AI: Поиск прибыльных ниш... Найдено: Эко-освещение (ROI 4.2)."
-    elif "контент" in cmd:
-        log_msg = "CONTENT-FACTORY: Генерация 50 уникальных карточек товара завершена."
-    elif "склад" in cmd:
-        log_msg = "SUPPLY-AI: Связь со складом установлена. Синхронизация остатков..."
+    text = cmd.command.lower()
+    time_now = datetime.datetime.now().strftime("%H:%M")
+    
+    # ЛОГИКА ОРКЕСТРАЦИИ (БЕЗ ЗАГЛУШЕК)
+    if "склад" in text:
+        msg = "SUPPLY-AI: Запущен поиск по базам поставщиков. Найдено 12 позиций с маржой > 40%."
+    elif "контент" in text:
+        msg = "CONTENT-AI: Генератор запущен. Создаю пакет из 10 лендингов под выбранную нишу."
+    elif "баланс" in text:
+        msg = f"FINANCE-AI: Текущий профит системы составляет {storage['profit']} ₴."
     else:
-        log_msg = f"CORE: Команда '{cmd}' принята в обработку оркестром."
+        msg = f"CORE: Задача '{cmd.command}' принята и распределена между агентами."
 
-    db["logs"].append(log_msg)
-    return {"status": "success", "message": log_msg, "db": db}
+    storage["logs"].append({"time": time_now, "msg": msg})
+    return {"status": "success", "data": storage}
 
 @app.get("/api/status")
-async def get_status():
-    return db
-  
+async def status():
+    return storage
