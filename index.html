@@ -1,35 +1,36 @@
-<script>
-const NAFANYA_CLIENT = {
-    pass: "", // Будет введено при входе
-    api: window.location.origin,
-
-    async send(cmd) {
-        const res = await fetch(`${this.api}/api/execute`, {
+const NafanyaOrchestra = {
+    pass: "",
+    
+    async send(cmdText) {
+        const response = await fetch('/api/execute', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({command: cmd, password: this.pass})
+            body: JSON.stringify({ command: cmdText, password: this.pass })
         });
-        const data = await res.json();
-        this.renderLogs(data.db.logs);
-        this.updateStats(data.db);
+        const result = await response.json();
+        this.updateUI(result.data);
     },
 
-    renderLogs(logs) {
-        const container = document.querySelector('.op-msgs');
-        container.innerHTML = logs.map(l => `<div class="msg-branch">${l}</div>`).join('');
-        container.scrollTop = container.scrollHeight;
-    },
+    updateUI(data) {
+        // Обновление логов
+        const logContainer = document.querySelector('.op-msgs');
+        logContainer.innerHTML = data.logs.map(log => `
+            <div class="msg-branch">
+                <small style="color:var(--ash)">${log.time}</small>
+                <div class="branch-bubble">${log.msg}</div>
+            </div>
+        `).join('');
+        logContainer.scrollTop = logContainer.scrollHeight;
 
-    updateStats(db) {
-        document.querySelector('.opp-val').innerText = db.balance + " ₴";
+        // Обновление прибыли
+        document.querySelector('.opp-val').innerText = data.profit + " ₴";
     }
 };
 
-// Функция логина
-function login() {
-    const p = document.getElementById('master-pass').value;
-    NAFANYA_CLIENT.pass = p;
-    document.getElementById('master-auth').style.display = 'none';
-    document.getElementById('os-content').style.display = 'block';
-}
-</script>
+// Привязка к кнопке EXECUTE
+document.querySelector('.send-btn').onclick = () => {
+    const inp = document.querySelector('.op-textarea');
+    NafanyaOrchestra.pass = prompt("Введите мастер-пароль:"); // Временное решение для входа
+    NafanyaOrchestra.send(inp.value);
+    inp.value = "";
+};
