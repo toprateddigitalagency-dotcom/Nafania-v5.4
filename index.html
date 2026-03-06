@@ -1,36 +1,112 @@
+/**
+ * NAFANYA OS v5.4 — CLIENT ENGINE
+ * Управление облачным ядром через API Vercel
+ */
+
 const NafanyaOrchestra = {
-    pass: "",
-    
+    pass: localStorage.getItem('master_key') || "", // Авто-вход, если пароль уже вводили
+    api_endpoint: '/api/execute',
+
+    // 1. ОТПРАВКА КОМАНДЫ
     async send(cmdText) {
-        const response = await fetch('/api/execute', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ command: cmdText, password: this.pass })
-        });
-        const result = await response.json();
-        this.updateUI(result.data);
+        if (!this.pass) {
+            this.askPassword();
+            return;
+        }
+
+        try {
+            const response = await fetch(this.api_endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    command: cmdText, 
+                    password: this.pass 
+                })
+            });
+
+            if (response.status === 403) {
+                alert("ОШИБКА ДОСТУПА: Неверный мастер-пароль.");
+                this.pass = "";
+                localStorage.removeItem('master_key');
+                return;
+            }
+
+            const result = await response.json();
+            this.updateUI(result.data);
+        } catch (error) {
+            console.error("Connection failed:", error);
+            this.logToUI("SYSTEM", "Ошибка связи с сервером Vercel. Проверьте статус бэкенда.");
+        }
     },
 
+    // 2. ОБНОВЛЕНИЕ ИНТЕРФЕЙСА (ДАННЫЕ ИЗ БЭКЕНДА)
     updateUI(data) {
-        // Обновление логов
+        // Обновление логов (Content, Supply, Traffic)
         const logContainer = document.querySelector('.op-msgs');
-        logContainer.innerHTML = data.logs.map(log => `
-            <div class="msg-branch">
-                <small style="color:var(--ash)">${log.time}</small>
-                <div class="branch-bubble">${log.msg}</div>
-            </div>
-        `).join('');
-        logContainer.scrollTop = logContainer.scrollHeight;
+        if (logContainer) {
+            logContainer.innerHTML = data.logs.map(log => `
+                <div class="msg-branch" style="border-left: 2px solid var(--lime); margin-bottom: 12px; padding-left: 10px;">
+                    <div style="font-size: 10px; color: var(--ash); margin-bottom: 4px;">${log.time} | NODE_RESPONSE</div>
+                    <div class="branch-bubble" style="color: var(--snow); font-size: 13px;">${log.msg}</div>
+                </div>
+            `).join('');
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
 
         // Обновление прибыли
-        document.querySelector('.opp-val').innerText = data.profit + " ₴";
+        const profitEl = document.querySelector('.opp-val');
+        if (profitEl) {
+            profitEl.innerText = data.profit.toLocaleString() + " ₴";
+        }
+
+        // Обновление статуса агентов (чипы)
+        document.querySelectorAll('.br-chip').forEach(chip => {
+            chip.style.borderColor = 'var(--lime)';
+            chip.style.boxShadow = '0 0 10px rgba(182,255,78,0.2)';
+        });
+    },
+
+    // 3. СИСТЕМА АВТОРИЗАЦИИ
+    askPassword() {
+        const p = prompt("NAFANYA OS: Введите мастер-пароль для доступа к управлению:");
+        if (p) {
+            this.pass = p;
+            localStorage.setItem('master_key', p);
+            this.send("SYSTEM_INIT_CHECK"); // Проверка связи при первом входе
+        }
+    },
+
+    logToUI(sender, msg) {
+        const logContainer = document.querySelector('.op-msgs');
+        const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        logContainer.insertAdjacentHTML('beforeend', `
+            <div class="msg-branch" style="border-left: 2px solid var(--red);">
+                <small>${time} | ${sender}</small>
+                <div>${msg}</div>
+            </div>
+        `);
     }
 };
 
-// Привязка к кнопке EXECUTE
-document.querySelector('.send-btn').onclick = () => {
-    const inp = document.querySelector('.op-textarea');
-    NafanyaOrchestra.pass = prompt("Введите мастер-пароль:"); // Временное решение для входа
-    NafanyaOrchestra.send(inp.value);
-    inp.value = "";
-};
+// ИНИЦИАЛИЗАЦИЯ КНОПОК
+document.addEventListener('DOMContentLoaded', () => {
+    const sendBtn = document.querySelector('.send-btn');
+    const textarea = document.querySelector('.op-textarea');
+
+    if (sendBtn && textarea) {
+        sendBtn.onclick = () => {
+            if (textarea.value.trim()) {
+                NafanyaOrchestra.send(textarea.value);
+                textarea.value = "";
+            }
+        };
+
+        // Отправка по Enter
+        textarea.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendBtn.click();
+            }
+        });
+    }
+});
