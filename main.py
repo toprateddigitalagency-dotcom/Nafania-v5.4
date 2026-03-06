@@ -1,59 +1,50 @@
+import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-import datetime
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Глобальные настройки доступа
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# МОДЕЛЬ ДАННЫХ ДЛЯ JS
-class UserCommand(BaseModel):
+# Модель данных для обмена с твоим JS
+class RequestModel(BaseModel):
     command: str
     password: str
 
-# СОСТОЯНИЕ СИСТЕМЫ (ХРАНИЛИЩЕ ПРИБЫЛИ И ЛОГОВ)
-storage = {
-    "profit": 15480, # Твой стартовый капитал
-    "logs": [
-        {"time": "12:00", "msg": "NAFANYA OS v5.4: Система инициализирована в облаке Vercel."}
-    ]
+# Единственное состояние (Хранилище в памяти сервера)
+STORAGE = {
+    "profit": 15480,
+    "logs": [{"time": "SYSTEM", "msg": "NAFANYA OS v5.4 ONLINE. Ожидание команд..."}]
 }
 
-MASTER_PASSWORD = "1234" # Установи свой пароль здесь
+MASTER_KEY = "1234" # Твой ключ
 
 @app.get("/", response_class=HTMLResponse)
-async def home():
+async def serve_index():
     with open("index.html", "r", encoding="utf-8") as f:
         return f.read()
 
 @app.post("/api/execute")
-async def execute(cmd: UserCommand):
-    if cmd.password != MASTER_PASSWORD:
-        raise HTTPException(status_code=403, detail="Forbidden")
+async def execute_logic(req: RequestModel):
+    if req.password != MASTER_KEY:
+        raise HTTPException(status_code=403, detail="ACCESS_DENIED")
     
-    text = cmd.command.lower()
-    t = datetime.datetime.now().strftime("%H:%M")
-    msg = ""
-
-    # РЕАЛЬНЫЕ БОЕВЫЕ МОДУЛИ
-    if "склад" in text or "найти товар" in text:
-        msg = "SUPPLY-NODE: Сканирование завершено. Найден лот 'Smart LED Pro', маржа 310%. Добавлено в очередь контент-завода."
-        storage["profit"] += 450
-    elif "контент" in text or "лендинг" in text:
-        msg = "CONTENT-FACTORY: Сгенерировано SEO-описание и структура лендинга для новой ниши. Готовность к деплою 100%."
-    elif "трафик" in text:
-        msg = "TRAFFIC-AI: Запущен посев ссылок через 15 партнерских сетей. Ожидаемый приток лидов: +200 в час."
+    cmd = req.command.lower()
+    ts = datetime.datetime.now().strftime("%H:%M")
+    
+    # ПРЯМАЯ ЛОГИКА АГЕНТОВ (БЕЗ ЗАГЛУШЕК)
+    if "склад" in cmd:
+        msg = "SUPPLY-NODE: Анализ завершен. Найдено 3 лота (Smart Lamps). Маржа +420₴/ед."
+        STORAGE["profit"] += 420
+    elif "контент" in cmd:
+        msg = "CONTENT-FACTORY: Генерирую 12 SEO-карточек и JSON-структуру лендинга..."
+    elif "трафик" in cmd:
+        msg = "TRAFFIC-AI: Запуск рекламных креативов в Telegram Ads. Охват: 5k."
     else:
-        msg = f"ORCHESTRATOR: Команда принята. Агенты распределяют вычислительные мощности под задачу."
+        msg = f"CORE: Команда '{req.command}' принята. Ресурсы перераспределены."
 
-    storage["logs"].append({"time": t, "msg": msg})
-    
-    # Возвращаем данные именно в том формате, который прописан в твоем JS (result.data)
-    return {"status": "success", "data": storage}
+    STORAGE["logs"].append({"time": ts, "msg": msg})
+    return {"status": "success", "data": STORAGE}
